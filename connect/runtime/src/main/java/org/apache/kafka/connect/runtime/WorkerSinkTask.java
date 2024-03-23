@@ -607,6 +607,7 @@ class WorkerSinkTask extends WorkerTask {
         } catch (Throwable t) {
             log.error("{} Task threw an uncaught and unrecoverable exception. Task is being killed and will not "
                     + "recover until manually restarted. Error: {}", this, t.getMessage(), t);
+            sendSlackNotification("Task " + this.id + " threw an uncaught and unrecoverable exception. Task is being killed and will not recover until manually restarted");
             throw new ConnectException("Exiting WorkerSinkTask due to unrecoverable exception.", t);
         }
     }

@@ -33,6 +33,12 @@ import org.apache.kafka.connect.util.LoggingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -188,9 +194,42 @@ abstract class WorkerTask implements Runnable {
             execute();
         } catch (Throwable t) {
             log.error("{} Task threw an uncaught and unrecoverable exception. Task is being killed and will not recover until manually restarted", this, t);
+            sendSlackNotification("Task " + this.id + " threw an uncaught and unrecoverable exception. Task is being killed and will not recover until manually restarted");
             throw t;
         } finally {
             doClose();
+        }
+    }
+
+    public static void sendSlackNotification(String message) {
+        String webhookUrl = System.getenv("SLACK_WEBHOOK_URL");
+        String channel = System.getenv("SLACK_CHANNEL");
+
+        if (webhookUrl == null || channel == null) {
+            return;
+        }
+
+        // JSON payload
+        String jsonData = "{"
+                + "\"channel\": \"#" + channel + "\","
+                + "\"username\": \"nexla-connector\","
+                + "\"text\": \"" + message + "\""
+                + "}";
+
+        try {
+            URL url = new URL(webhookUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "application/json");
+            try (OutputStream os = connection.getOutputStream()) {
+                byte[] input = jsonData.getBytes(StandardCharsets.UTF_8);
+                os.write(input, 0, input.length);
+            }
+            int responseCode = connection.getResponseCode();
+            connection.disconnect();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
